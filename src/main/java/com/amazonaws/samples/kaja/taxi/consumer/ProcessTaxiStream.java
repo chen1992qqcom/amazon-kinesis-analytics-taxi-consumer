@@ -18,9 +18,13 @@ package com.amazonaws.samples.kaja.taxi.consumer;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.samples.kaja.taxi.consumer.events.EventDeserializationSchema;
 import com.amazonaws.samples.kaja.taxi.consumer.events.TimestampAssigner;
+import com.amazonaws.samples.kaja.taxi.consumer.events.es.AverageTripDistance;
 import com.amazonaws.samples.kaja.taxi.consumer.events.es.AverageTripDuration;
+import com.amazonaws.samples.kaja.taxi.consumer.events.es.AverageTripSpeed;
 import com.amazonaws.samples.kaja.taxi.consumer.events.es.PickupCount;
+import com.amazonaws.samples.kaja.taxi.consumer.events.flink.TripDistance;
 import com.amazonaws.samples.kaja.taxi.consumer.events.flink.TripDuration;
+import com.amazonaws.samples.kaja.taxi.consumer.events.flink.TripSpeed;
 import com.amazonaws.samples.kaja.taxi.consumer.events.kinesis.Event;
 import com.amazonaws.samples.kaja.taxi.consumer.events.kinesis.TripEvent;
 import com.amazonaws.samples.kaja.taxi.consumer.operators.*;
@@ -135,6 +139,28 @@ public class ProcessTaxiStream {
         .timeWindow(Time.hours(1))
         .apply(new TripDurationToAverageTripDuration());
 
+    DataStream<AverageTripDistance> distances = trips
+            .flatMap(new TripToDistance())
+            .keyBy(new KeySelector<TripDistance, Tuple2<String, String>>() {
+              @Override
+              public Tuple2<String, String> getKey(TripDistance item) throws Exception {
+                return Tuple2.of(item.pickupGeoHash, item.airportCode);
+              }
+            })
+            .timeWindow(Time.hours(1))
+            .apply(new TripDistanceToAverageTripDistance());
+
+    DataStream<AverageTripSpeed> speed = trips
+            .flatMap(new TripToSpeed())
+            .keyBy(new KeySelector<TripSpeed, Tuple2<String, String>>() {
+              @Override
+              public Tuple2<String, String> getKey(TripSpeed item) throws Exception {
+                return Tuple2.of(item.pickupGeoHash, item.airportCode);
+              }
+            })
+            .timeWindow(Time.hours(1))
+            .apply(new TripSpeedToAverageTripSpeed());
+
 
     if (parameter.has("ElasticsearchEndpoint")) {
       String elasticsearchEndpoint = parameter.get("ElasticsearchEndpoint");
@@ -147,6 +173,8 @@ public class ProcessTaxiStream {
 
       pickupCounts.addSink(AmazonElasticsearchSink.buildElasticsearchSink(elasticsearchEndpoint, region, "pickup_count", "_doc"));
       tripDurations.addSink(AmazonElasticsearchSink.buildElasticsearchSink(elasticsearchEndpoint, region, "trip_duration", "_doc"));
+      distances.addSink(AmazonElasticsearchSink.buildElasticsearchSink(elasticsearchEndpoint, region, "trip_distance", "_doc"));
+      speed.addSink(AmazonElasticsearchSink.buildElasticsearchSink(elasticsearchEndpoint, region, "trip_speed", "_doc"));
     }
 
 
