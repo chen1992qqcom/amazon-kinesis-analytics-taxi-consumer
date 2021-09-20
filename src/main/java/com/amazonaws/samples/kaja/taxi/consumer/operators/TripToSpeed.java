@@ -16,7 +16,7 @@ public class TripToSpeed implements FlatMapFunction<TripEvent, TripSpeed> {
         String pickupLocation = GeoHash.geoHashStringWithCharacterPrecision(tripEvent.pickupLatitude, tripEvent.pickupLongitude, 6);
         double distance = GeoUtils.getDistance(tripEvent.pickupLatitude, tripEvent.pickupLongitude, tripEvent.dropoffLatitude, tripEvent.dropoffLongitude);
         double tripDuration = Duration.between(tripEvent.pickupDatetime, tripEvent.dropoffDatetime).toMinutes();
-        double speed = distance / tripDuration / 60; // km per hour
+        double speed = distance / tripDuration * 60; // km per hour
 
 
         if (GeoUtils.nearJFK(tripEvent.dropoffLatitude, tripEvent.dropoffLongitude)) {
